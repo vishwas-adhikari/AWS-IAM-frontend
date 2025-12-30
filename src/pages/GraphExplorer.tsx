@@ -1,144 +1,147 @@
-import { useEffect } from 'react';
-import {
-  ReactFlow,
-  MiniMap,
-  Controls,
-  Background,
-  BackgroundVariant,
-  Node,
-  Edge,
-  useNodesState,
-  useEdgesState,
-  MarkerType, // <--- 1. ADD THIS IMPORT
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
 import { useScan } from '../context/ScanContext';
-import { User, Users, Shield, FileText } from 'lucide-react';
+import ForceGraph2D from 'react-force-graph-2d';
+import { useRef, useEffect, useState } from 'react';
 
 const GraphExplorer = () => {
   const { scanData } = useScan();
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const fgRef = useRef<any>();
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
-  const nodeTypes = { custom: CustomNode };
-
-  const getRiskColor = (risk: string) => {
-    switch (risk) {
-      case 'CRITICAL': return { bg: 'bg-red-500/20', border: 'border-red-500', text: 'text-red-400' };
-      case 'HIGH': return { bg: 'bg-orange-500/20', border: 'border-orange-500', text: 'text-orange-400' };
-      case 'MEDIUM': return { bg: 'bg-yellow-500/20', border: 'border-yellow-500', text: 'text-yellow-400' };
-      default: return { bg: 'bg-emerald-500/20', border: 'border-emerald-500', text: 'text-emerald-400' };
-    }
-  };
-
-  const getNodeIcon = (type: string) => {
-    switch (type) {
-      case 'USER': return User;
-      case 'GROUP': return Users;
-      case 'ROLE': return Shield;
-      case 'POLICY': return FileText;
-      default: return Shield;
-    }
-  };
-
+  // Handle resizing
   useEffect(() => {
-    if (!scanData) return;
+    const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-    const apiNodes: Node[] = scanData.graph_data.nodes.map((node, index) => {
-      const colors = getRiskColor(node.risk_level);
-      const Icon = getNodeIcon(node.type);
-      const x = (index % 3) * 300; // Increased spacing slightly
-      const y = Math.floor(index / 3) * 150;
+  // --- PHYSICS ENGINE TUNING ---
+  useEffect(() => {
+    if (fgRef.current) {
+      // Increase the distance between connected nodes
+      fgRef.current.d3Force('link').distance(150); 
+      // Increase repulsion (charge) so nodes stay far apart
+      fgRef.current.d3Force('charge').strength(-300);
+      // Add some centering force
+      fgRef.current.d3Force('center').strength(0.05);
+    }
+  }, [scanData]);
 
-      return {
-        id: node.node_id,
-        type: 'custom',
-        position: { x, y },
-        data: {
-          label: node.label,
-          type: node.type,
-          risk: node.risk_level,
-          icon: Icon,
-          colors,
-        },
-      };
-    });
+  if (!scanData) return <div className="text-white p-10">Loading Graph Engine...</div>;
 
-    const apiEdges: Edge[] = scanData.graph_data.edges.map((edge) => ({
-      id: `e-${edge.id}`,
-      source: edge.source,
-      target: edge.target,
-      label: edge.label,
-      animated: true,
-      style: { stroke: '#22d3ee', strokeWidth: 2 },
-      labelStyle: { fill: '#94a3b8', fontSize: 12, fontWeight: 600 },
-      labelBgStyle: { fill: '#0f172a', fillOpacity: 0.8 },
-      // --- 2. ADD ARROWHEAD CONFIGURATION HERE ---
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: '#22d3ee',
-      },
-      // -------------------------------------------
-    }));
-
-    setNodes(apiNodes);
-    setEdges(apiEdges);
-  }, [scanData, setNodes, setEdges]);
-
-  if (!scanData) return <div className="text-white p-10">Loading Graph...</div>;
+  const gData = {
+    nodes: scanData.graph_data.nodes.map(n => ({
+      id: n.node_id,
+      name: n.label,
+      type: n.type,
+      risk: n.risk_level,
+      color: n.risk_level === 'CRITICAL' ? '#ef4444' : 
+             n.risk_level === 'HIGH' ? '#f97316' : 
+             n.risk_level === 'MEDIUM' ? '#eab308' : '#10b981',
+      // INCREASED BASE SIZE
+      size: n.risk_level === 'CRITICAL' ? 12 : 8
+    })),
+    links: scanData.graph_data.edges.map(e => ({
+      source: e.source,
+      target: e.target,
+      label: e.label
+    }))
+  };
 
   return (
-    <div className="space-y-6 h-full">
-      {/* ... (Keep the rest of your JSX exactly the same) ... */}
+    <div className="space-y-6 h-full flex flex-col">
       <div>
-        <h1 className="text-3xl font-bold text-white mb-2">IAM Relationship Graph</h1>
-        <p className="text-slate-400">Visualize the connections between IAM entities</p>
+        <h1 className="text-3xl font-bold text-white mb-2">IAM Relationship Map</h1>
+        <p className="text-slate-400">
+          Clustered View: Connected entities represent potential <span className="text-red-400">Privilege Escalation paths</span>.
+        </p>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
-         {/* Legend (Keep same) */}
-        <div className="flex items-center gap-6 mb-4">
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-500 rounded-full" /><span className="text-sm text-slate-400">Critical</span></div>
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-orange-500 rounded-full" /><span className="text-sm text-slate-400">High</span></div>
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-yellow-500 rounded-full" /><span className="text-sm text-slate-400">Medium</span></div>
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-500 rounded-full" /><span className="text-sm text-slate-400">Low</span></div>
+      <div className="flex-1 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden relative shadow-2xl min-h-[700px]">
+        {/* Legend Overlay */}
+        <div className="absolute top-4 left-4 z-10 bg-slate-900/90 backdrop-blur-md p-5 rounded-lg border border-slate-700 space-y-3">
+            <div className="flex items-center gap-3 text-sm text-slate-200">
+                <div className="w-4 h-4 bg-red-500 rounded-full shadow-[0_0_10px_#ef4444]" /> Critical Risk
+            </div>
+            <div className="flex items-center gap-3 text-sm text-slate-200">
+                <div className="w-4 h-4 bg-orange-500 rounded-full" /> High Risk
+            </div>
+            <div className="flex items-center gap-3 text-sm text-slate-200">
+                <div className="w-4 h-4 bg-emerald-500 rounded-full" /> Safe Entity
+            </div>
+            <div className="pt-2 border-t border-slate-800">
+                <p className="text-[11px] text-slate-500 italic">Drag nodes to explore connections</p>
+                <p className="text-[11px] text-slate-500 italic">Scroll to zoom in/out</p>
+            </div>
         </div>
 
-        <div className="h-[600px] bg-slate-950 rounded-lg border border-slate-800">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            nodeTypes={nodeTypes}
-            fitView
-            className="bg-slate-950"
-          >
-            <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#1e293b" />
-            <Controls className="bg-slate-800 border-slate-700" />
-            <MiniMap className="bg-slate-900 border border-slate-700" />
-          </ReactFlow>
-        </div>
+        <ForceGraph2D
+          ref={fgRef}
+          graphData={gData}
+          width={windowSize.width - 320}
+          height={700}
+          backgroundColor="#020617"
+          nodeRelSize={8}
+          linkDirectionalArrowLength={6}
+          linkDirectionalArrowRelPos={1}
+          linkCurvature={0.2}
+          linkColor={() => '#475569'}
+          linkWidth={2}
+          
+          // --- IMPROVED NODE DRAWING ---
+          nodeCanvasObject={(node: any, ctx, globalScale) => {
+            const label = node.name;
+            const fontSize = 14 / globalScale; // Larger font
+            ctx.font = `${fontSize}px "Inter", sans-serif`;
+            
+            // Draw Node Circle
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, node.size, 0, 2 * Math.PI, false);
+            ctx.fillStyle = node.color;
+            ctx.fill();
+
+            // Add a border to the node
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1 / globalScale;
+            ctx.stroke();
+            
+            // Text Styling
+            const textWidth = ctx.measureText(label).width;
+            const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); 
+            
+            // Draw label background for readability
+            ctx.fillStyle = 'rgba(2, 6, 23, 0.8)';
+            ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y + node.size + 2, bckgDimensions[0], bckgDimensions[1]);
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = node.risk === 'CRITICAL' ? '#fca5a5' : '#e2e8f0';
+            ctx.fillText(label, node.x, node.y + node.size + 3);
+            
+            // Red Glow for Critical Nodes
+            if (node.risk === 'CRITICAL') {
+                ctx.shadowColor = node.color;
+                ctx.shadowBlur = 20;
+            } else {
+                ctx.shadowBlur = 0;
+            }
+          }}
+          
+          cooldownTicks={100}
+          onEngineStop={() => fgRef.current.zoomToFit(400, 100)}
+        />
+      </div>
+
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
+        <h2 className="text-lg font-semibold text-white mb-2">Security Analysis</h2>
+        <p className="text-sm text-slate-400 leading-relaxed">
+          The map uses a force-directed layout where <span className="text-cyan-400">relationships</span> exert pull. 
+          Clusters containing <span className="text-red-400 font-bold">Red Nodes</span> indicate high-value targets or 
+          exposed entry points that are connected to other parts of your infrastructure. 
+          Isolated nodes are generally lower risk as they lack lateral movement paths.
+        </p>
       </div>
     </div>
   );
 };
-
-// ... (Keep CustomNode function same) ...
-function CustomNode({ data }: { data: any }) {
-  const Icon = data.icon;
-  const { colors } = data;
-  return (
-    <div className={`px-4 py-3 border-2 ${colors.border} ${colors.bg} rounded-lg backdrop-blur-sm min-w-[160px]`}>
-      <div className="flex items-center gap-2">
-        <Icon className={`w-4 h-4 ${colors.text}`} />
-        <div>
-          <div className="text-sm font-semibold text-white">{data.label}</div>
-          <div className="text-xs text-slate-400">{data.type}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default GraphExplorer;
