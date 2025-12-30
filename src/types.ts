@@ -1,4 +1,4 @@
-// Matches the Django 'ScanSerializer' output
+// Matches the Django 'FindingSerializer' output
 export interface APIFinding {
   id: number;
   category: string;
@@ -9,14 +9,16 @@ export interface APIFinding {
   remediation: string;
 }
 
+// Matches the Django 'GraphNodeSerializer' output
 export interface APIGraphNode {
   id: number;
   node_id: string;
   label: string;
-  type: 'USER' | 'GROUP' | 'ROLE' | 'POLICY';
+  type: 'USER' | 'GROUP' | 'ROLE' | 'POLICY' | 'UNKNOWN'; // Added UNKNOWN for external nodes
   risk_level: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
+// Matches the Django 'GraphEdgeSerializer' output
 export interface APIGraphEdge {
   id: number;
   source: string;
@@ -24,20 +26,22 @@ export interface APIGraphEdge {
   label: string;
 }
 
+// Matches the Django 'ScanSerializer' output EXACTLY
 export interface APIScanResult {
   id: number;
   account_id: string;
   account_alias: string;
   scan_time: string;
   risk_score: number;
-  stats: {
-    users: number; // Mapped from total_users
-    roles: number; // Mapped from total_roles
-    policies: number; // Mapped from total_policies
-    critical_risks: number; // Mapped from critical_count
-    high_risks: number; // Mapped from high_count
-    medium_risks: number; // Mapped from medium_count
-  };
+  
+  // Flat fields (No 'stats' object)
+  total_users: number;
+  total_roles: number;
+  total_policies: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+
   findings: APIFinding[];
   graph_data: {
     nodes: APIGraphNode[];

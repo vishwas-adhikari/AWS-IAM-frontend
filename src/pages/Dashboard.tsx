@@ -24,16 +24,23 @@ const Dashboard = () => {
   } = scanData;
 
   const getRiskLevel = (score: number) => {
-    if (score >= 80) return { text: 'Excellent', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' };
-    if (score >= 60) return { text: 'Good', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' };
-    if (score >= 40) return { text: 'Fair', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' };
-    return { text: 'Poor', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' };
+    // High Score = BAD (Red)
+    if (score >= 80) return { text: 'Critical', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' };
+    if (score >= 50) return { text: 'High', color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' };
+    if (score >= 20) return { text: 'Medium', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' };
+    // Low Score = GOOD (Green)
+    return { text: 'Low', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' };
   };
 
   const riskLevel = getRiskLevel(risk_score);
 
   const gaugeData = [
-    { name: 'Score', value: risk_score, color: risk_score >= 60 ? '#22d3ee' : risk_score >= 40 ? '#facc15' : '#ef4444' },
+    { 
+      name: 'Score', 
+      value: risk_score, 
+      // Color logic flipped: High score gets Red
+      color: risk_score >= 80 ? '#ef4444' : risk_score >= 50 ? '#f97316' : risk_score >= 20 ? '#eab308' : '#10b981' 
+    },
     { name: 'Remaining', value: 100 - risk_score, color: '#1e293b' },
   ];
 
@@ -116,7 +123,7 @@ const Dashboard = () => {
               <span className={`font-semibold ${riskLevel.color}`}>{riskLevel.text}</span>
             </div>
             <p className="text-xs text-slate-500 mt-4">
-              Higher score indicates better security posture
+              Lower score indicates better security posture
             </p>
           </div>
         </div>
