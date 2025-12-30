@@ -1,10 +1,27 @@
-import { mockData } from '../mockData';
+import { useScan } from '../context/ScanContext';
 import { Users, Shield, FileText, AlertTriangle, TrendingUp } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 const Dashboard = () => {
-  const { summary } = mockData;
-  const { stats, risk_score, account_alias, account_id, scan_time } = summary;
+  const { scanData, loading } = useScan();
+
+  if (loading) return <div className="text-white p-10">Loading Dashboard...</div>;
+  if (!scanData) return <div className="text-white p-10">No scan data available. Go to Connect Account.</div>;
+
+  // --- FIXED DATA MAPPING HERE ---
+  // We read directly from the flat API fields (total_users, etc.)
+  const { 
+    risk_score, 
+    account_alias, 
+    account_id, 
+    scan_time,
+    total_users,
+    total_roles,
+    total_policies,
+    critical_count,
+    high_count,
+    medium_count
+  } = scanData;
 
   const getRiskLevel = (score: number) => {
     if (score >= 80) return { text: 'Excellent', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' };
@@ -25,16 +42,17 @@ const Dashboard = () => {
     { day: 'Tue', score: 62 },
     { day: 'Wed', score: 60 },
     { day: 'Thu', score: 63 },
-    { day: 'Fri', score: 65 },
+    { day: 'Fri', score: risk_score },
   ];
 
+  // --- FIXED STAT CARDS ---
   const statCards = [
-    { label: 'Total Users', value: stats.users, icon: Users, color: 'cyan' },
-    { label: 'Total Roles', value: stats.roles, icon: Shield, color: 'blue' },
-    { label: 'Total Policies', value: stats.policies, icon: FileText, color: 'slate' },
-    { label: 'Critical Risks', value: stats.critical_risks, icon: AlertTriangle, color: 'red' },
-    { label: 'High Risks', value: stats.high_risks, icon: AlertTriangle, color: 'orange' },
-    { label: 'Medium Risks', value: stats.medium_risks, icon: AlertTriangle, color: 'yellow' },
+    { label: 'Total Users', value: total_users, icon: Users, color: 'cyan' },
+    { label: 'Total Roles', value: total_roles, icon: Shield, color: 'blue' },
+    { label: 'Total Policies', value: total_policies, icon: FileText, color: 'slate' },
+    { label: 'Critical Risks', value: critical_count, icon: AlertTriangle, color: 'red' },
+    { label: 'High Risks', value: high_count, icon: AlertTriangle, color: 'orange' },
+    { label: 'Medium Risks', value: medium_count, icon: AlertTriangle, color: 'yellow' },
   ];
 
   const getColorClasses = (color: string) => {
@@ -46,7 +64,7 @@ const Dashboard = () => {
       orange: { text: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
       yellow: { text: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' },
     };
-    return colors[color];
+    return colors[color] || colors.slate;
   };
 
   return (
@@ -54,11 +72,11 @@ const Dashboard = () => {
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">Security Dashboard</h1>
         <div className="flex items-center gap-4 text-sm text-slate-400">
-          <span>Account: {account_alias}</span>
+          <span>Account: {account_alias || "N/A"}</span>
           <span>•</span>
           <span>ID: {account_id}</span>
           <span>•</span>
-          <span>Last Scan: {new Date(scan_time).toLocaleDateString()}</span>
+          <span>Last Scan: {new Date(scan_time).toLocaleString()}</span>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useEffect } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -11,10 +11,16 @@ import {
   useEdgesState,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { mockData } from '../mockData';
+import { useScan } from '../context/ScanContext'; // Import Context
 import { User, Users, Shield, FileText } from 'lucide-react';
 
 const GraphExplorer = () => {
+  const { scanData } = useScan(); // Get Real Data
+
+  // --- FIX APPLIED HERE: Added <Node> and <Edge> generics ---
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
   const nodeTypes = {
     custom: CustomNode,
   };
@@ -34,50 +40,58 @@ const GraphExplorer = () => {
 
   const getNodeIcon = (type: string) => {
     switch (type) {
-      case 'USER':
-        return User;
-      case 'GROUP':
-        return Users;
-      case 'ROLE':
-        return Shield;
-      case 'POLICY':
-        return FileText;
-      default:
-        return Shield;
+      case 'USER': return User;
+      case 'GROUP': return Users;
+      case 'ROLE': return Shield;
+      case 'POLICY': return FileText;
+      default: return Shield;
     }
   };
 
-  const initialNodes: Node[] = mockData.graph_data.nodes.map((node) => {
-    const colors = getRiskColor(node.risk);
-    const Icon = getNodeIcon(node.type);
+  // Load Data when scanData changes
+  useEffect(() => {
+    if (!scanData) return;
 
-    return {
-      id: node.id,
-      type: 'custom',
-      position: node.position,
-      data: {
-        label: node.label,
-        type: node.type,
-        risk: node.risk,
-        icon: Icon,
-        colors,
-      },
-    };
-  });
+    // 1. Transform API Nodes to React Flow Nodes
+    const apiNodes: Node[] = scanData.graph_data.nodes.map((node, index) => {
+      const colors = getRiskColor(node.risk_level);
+      const Icon = getNodeIcon(node.type);
+      
+      // Auto-layout logic (Simple grid for MVP)
+      const x = (index % 3) * 250; 
+      const y = Math.floor(index / 3) * 150;
 
-  const initialEdges: Edge[] = mockData.graph_data.edges.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    label: edge.label,
-    animated: true,
-    style: { stroke: '#22d3ee', strokeWidth: 2 },
-    labelStyle: { fill: '#94a3b8', fontSize: 12, fontWeight: 600 },
-    labelBgStyle: { fill: '#0f172a', fillOpacity: 0.8 },
-  }));
+      return {
+        id: node.node_id, 
+        type: 'custom',
+        position: { x, y }, 
+        data: {
+          label: node.label,
+          type: node.type,
+          risk: node.risk_level,
+          icon: Icon,
+          colors,
+        },
+      };
+    });
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+    // 2. Transform API Edges to React Flow Edges
+    const apiEdges: Edge[] = scanData.graph_data.edges.map((edge) => ({
+      id: `e-${edge.id}`, // Ensure unique string ID
+      source: edge.source,
+      target: edge.target,
+      label: edge.label,
+      animated: true,
+      style: { stroke: '#22d3ee', strokeWidth: 2 },
+      labelStyle: { fill: '#94a3b8', fontSize: 12, fontWeight: 600 },
+      labelBgStyle: { fill: '#0f172a', fillOpacity: 0.8 },
+    }));
+
+    setNodes(apiNodes);
+    setEdges(apiEdges);
+  }, [scanData, setNodes, setEdges]);
+
+  if (!scanData) return <div className="text-white p-10">Loading Graph...</div>;
 
   return (
     <div className="space-y-6 h-full">
@@ -89,23 +103,12 @@ const GraphExplorer = () => {
       </div>
 
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+        {/* Legend */}
         <div className="flex items-center gap-6 mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full" />
-            <span className="text-sm text-slate-400">Critical</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-orange-500 rounded-full" />
-            <span className="text-sm text-slate-400">High</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-yellow-500 rounded-full" />
-            <span className="text-sm text-slate-400">Medium</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-emerald-500 rounded-full" />
-            <span className="text-sm text-slate-400">Low</span>
-          </div>
+          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-500 rounded-full" /><span className="text-sm text-slate-400">Critical</span></div>
+          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-orange-500 rounded-full" /><span className="text-sm text-slate-400">High</span></div>
+          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-yellow-500 rounded-full" /><span className="text-sm text-slate-400">Medium</span></div>
+          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-500 rounded-full" /><span className="text-sm text-slate-400">Low</span></div>
         </div>
 
         <div className="h-[600px] bg-slate-950 rounded-lg border border-slate-800">
@@ -131,24 +134,6 @@ const GraphExplorer = () => {
               }}
             />
           </ReactFlow>
-        </div>
-      </div>
-
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-white mb-4">Graph Insights</h2>
-        <div className="space-y-3 text-sm">
-          <div className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-            <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5" />
-            <p className="text-slate-300">
-              <span className="font-semibold text-red-400">Critical Path Detected:</span> User 'Dave' can indirectly gain AdministratorAccess through role assumption.
-            </p>
-          </div>
-          <div className="flex items-start gap-3 p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-            <div className="w-2 h-2 bg-orange-500 rounded-full mt-1.5" />
-            <p className="text-slate-300">
-              <span className="font-semibold text-orange-400">High Risk:</span> Admin Group has direct attachment to AdministratorAccess policy.
-            </p>
-          </div>
         </div>
       </div>
     </div>
