@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useScan } from '../context/ScanContext'; // Import Context
-import { ChevronDown, ChevronUp, Filter, AlertCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Filter, AlertCircle, XCircle, AlertTriangle, ArrowRight } from 'lucide-react';
+import { FindingHop } from '../types';
 
 const RiskFindings = () => {
   const { scanData } = useScan(); // Get Real Data
@@ -12,6 +14,11 @@ const RiskFindings = () => {
   if (!scanData) return <div className="text-white p-10">No findings data available.</div>;
 
   const findings = scanData.findings; // Use API findings
+
+  // Node id -> display label, for hops that don't carry their own labels
+  const nodeLabels = new Map(scanData.graph_data.nodes.map((n) => [n.node_id, n.label]));
+  const hopLabel = (id: string, label?: string) => label || nodeLabels.get(id) || id;
+  const hopEdge = (hop: FindingHop) => (hop.techniques?.length ? hop.techniques.join(', ') : hop.edge);
 
   const toggleRow = (id: number) => {
     const newExpanded = new Set(expandedRows);
@@ -135,6 +142,38 @@ const RiskFindings = () => {
                               <h3 className="text-sm font-semibold text-white mb-2">Description</h3>
                               <p className="text-sm text-slate-300 leading-relaxed">{risk.description}</p>
                             </div>
+                            {(risk.details?.hops?.length ?? 0) > 0 && (
+                              <div className="border-t border-slate-700 pt-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h3 className="text-sm font-semibold text-white">Path</h3>
+                                  <Link
+                                    to={`/graph-explorer?finding=${risk.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+                                  >
+                                    View path in graph
+                                  </Link>
+                                </div>
+                                <ol className="flex flex-wrap items-center gap-2">
+                                  {risk.details.hops!.map((hop, i) => (
+                                    <li key={i} className="flex flex-wrap items-center gap-2">
+                                      {i === 0 && (
+                                        <code className="text-sm text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded" title={hop.from}>
+                                          {hopLabel(hop.from, hop.from_label)}
+                                        </code>
+                                      )}
+                                      <span className="flex items-center gap-1 text-xs text-slate-400">
+                                        <span className="px-2 py-0.5 rounded border border-slate-600 bg-slate-800">{hopEdge(hop)}</span>
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                      </span>
+                                      <code className="text-sm text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded" title={hop.to}>
+                                        {hopLabel(hop.to, hop.to_label)}
+                                      </code>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </div>
+                            )}
                             <div className="border-t border-slate-700 pt-4">
                               <h3 className="text-sm font-semibold text-white mb-2">Remediation</h3>
                               <p className="text-sm text-slate-300 leading-relaxed">{risk.remediation}</p>

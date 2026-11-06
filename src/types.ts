@@ -1,20 +1,51 @@
+// One step of a path stored in a finding's details.hops
+export interface FindingHop {
+  from: string;          // GraphNode.node_id
+  to: string;            // GraphNode.node_id
+  from_label?: string;
+  to_label?: string;
+  edge: string;          // edge label, e.g. "CAN_ASSUME"
+  techniques?: string[];
+}
+
+// Rule-specific structured data attached to a finding
+export interface FindingDetails {
+  hops?: FindingHop[];
+  [key: string]: unknown;
+}
+
 // Matches the Django 'FindingSerializer' output
 export interface APIFinding {
   id: number;
+  rule_id: string;
   category: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   title: string;
   description: string;
   affected_resource: string;
   remediation: string;
+  details: FindingDetails;
 }
+
+// Matches GraphNode.TYPE_CHOICES in the Django model
+export type GraphNodeType =
+  | 'USER'
+  | 'GROUP'
+  | 'ROLE'
+  | 'POLICY'
+  | 'ACCOUNT_ROOT'
+  | 'EXTERNAL_ACCOUNT'
+  | 'PUBLIC'
+  | 'SERVICE'
+  | 'FEDERATED'
+  | 'UNKNOWN';
 
 // Matches the Django 'GraphNodeSerializer' output
 export interface APIGraphNode {
   id: number;
   node_id: string;
   label: string;
-  type: 'USER' | 'GROUP' | 'ROLE' | 'POLICY' | 'UNKNOWN'; // Added UNKNOWN for external nodes
+  type: GraphNodeType;
   risk_level: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
@@ -33,7 +64,7 @@ export interface APIScanResult {
   account_alias: string;
   scan_time: string;
   risk_score: number;
-  
+
   // Flat fields (No 'stats' object)
   total_users: number;
   total_roles: number;
