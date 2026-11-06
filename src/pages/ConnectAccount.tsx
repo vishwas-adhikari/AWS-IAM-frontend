@@ -1,18 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Key, Lock, Loader2, AlertCircle } from 'lucide-react';
+import axios from 'axios';
+import { Shield, Key, Loader2, AlertCircle } from 'lucide-react';
 import { useScan } from '../context/ScanContext'; // Import our new Context
+import { API_URL, apiErrorMessage } from '../api';
+
+// Select value meaning "no named profile": the backend uses its default credential chain
+const DEFAULT_CHAIN = '';
 
 const ConnectAccount = () => {
   const navigate = useNavigate();
   const { startScan } = useScan(); // Get the startScan function
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [credentials, setCredentials] = useState({
-    accessKeyId: '',
-    secretAccessKey: '',
-  });
+  const [profiles, setProfiles] = useState<string[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(true);
+  const [profile, setProfile] = useState(DEFAULT_CHAIN);
+
+  // Load the AWS profile names configured on the backend (names only, never keys)
+  useEffect(() => {
+    axios.get<{ profiles: string[] }>(`${API_URL}/api/profiles/`)
+      .then((response) => setProfiles(response.data.profiles))
+      .catch((err) => setError(apiErrorMessage(err, "Could not load AWS profiles. Is the backend running?")))
+      .finally(() => setProfilesLoading(false));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,13 +33,12 @@ const ConnectAccount = () => {
 
     try {
       // Call the Real API
-      await startScan(credentials.accessKeyId, credentials.secretAccessKey);
+      await startScan(profile);
       // If successful, redirect
       navigate('/dashboard');
-    } catch (err: any) {
+    } catch (err) {
       console.error("Scan Failed:", err);
-      // Error is already handled in Context, but we can set local state if needed
-      setError("Connection failed. Check your keys or backend server.");
+      setError(apiErrorMessage(err, "Connection failed. Check the profile or backend server."));
     } finally {
       setLoading(false);
     }
@@ -47,7 +58,7 @@ const ConnectAccount = () => {
 
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-2xl">
           {/* ... Secure Connection Header (Same) ... */}
-          
+
           {/* Error Message Alert */}
           {error && (
              <div className="mb-6 bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-center gap-3">
@@ -57,42 +68,31 @@ const ConnectAccount = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Inputs (Same as before) */}
             <div>
-              <label htmlFor="accessKeyId" className="block text-sm font-medium text-slate-300 mb-2">AWS Access Key ID</label>
+              <label htmlFor="profile" className="block text-sm font-medium text-slate-300 mb-2">AWS Profile</label>
               <div className="relative">
                 <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input
-                  type="text"
-                  id="accessKeyId"
-                  value={credentials.accessKeyId}
-                  onChange={(e) => setCredentials({ ...credentials, accessKeyId: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-11 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all"
-                  placeholder="AKIA..."
-                  required
-                />
+                <select
+                  id="profile"
+                  value={profile}
+                  onChange={(e) => setProfile(e.target.value)}
+                  disabled={profilesLoading}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all disabled:opacity-50"
+                >
+                  <option value={DEFAULT_CHAIN}>Default credential chain</option>
+                  {profiles.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="secretAccessKey" className="block text-sm font-medium text-slate-300 mb-2">AWS Secret Access Key</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input
-                  type="password"
-                  id="secretAccessKey"
-                  value={credentials.secretAccessKey}
-                  onChange={(e) => setCredentials({ ...credentials, secretAccessKey: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-11 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all"
-                  placeholder="wJalr..."
-                  required
-                />
-              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Profiles come from the backend's ~/.aws/config and ~/.aws/credentials. Keys never leave the server.
+              </p>
             </div>
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || profilesLoading}
               className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
