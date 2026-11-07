@@ -38,6 +38,7 @@ export type GraphNodeType =
   | 'PUBLIC'
   | 'SERVICE'
   | 'FEDERATED'
+  | 'ADMIN'
   | 'UNKNOWN';
 
 // Matches the Django 'GraphNodeSerializer' output

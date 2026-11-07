@@ -11,6 +11,7 @@ const NODE_TYPE_COLORS: Partial<Record<GraphNodeType, string>> = {
   PUBLIC: '#ec4899',
   SERVICE: '#06b6d4',
   FEDERATED: '#a5b4fc',
+  ADMIN: '#ef4444',
   UNKNOWN: '#94a3b8',
 };
 
@@ -20,6 +21,7 @@ const NODE_TYPE_LABELS: [GraphNodeType, string][] = [
   ['PUBLIC', 'Public (Anyone)'],
   ['SERVICE', 'AWS Service'],
   ['FEDERATED', 'Federated Provider'],
+  ['ADMIN', 'Account Admin (escalation target)'],
   ['UNKNOWN', 'Unknown'],
 ];
 
@@ -183,6 +185,14 @@ const GraphExplorer = () => {
             // Dim everything that isn't on the selected path
             ctx.globalAlpha = hasSelection && !onPath ? 0.25 : 1;
 
+            // Red Glow for Critical Nodes (set before drawing so it applies to this node)
+            if (node.risk === 'CRITICAL') {
+                ctx.shadowColor = node.color;
+                ctx.shadowBlur = 20;
+            } else {
+                ctx.shadowBlur = 0;
+            }
+
             // Draw Node Circle
             ctx.beginPath();
             ctx.arc(node.x, node.y, node.size, 0, 2 * Math.PI, false);
@@ -208,13 +218,8 @@ const GraphExplorer = () => {
             ctx.fillText(label, node.x, node.y + node.size + 3);
             ctx.globalAlpha = 1;
 
-            // Red Glow for Critical Nodes
-            if (node.risk === 'CRITICAL') {
-                ctx.shadowColor = node.color;
-                ctx.shadowBlur = 20;
-            } else {
-                ctx.shadowBlur = 0;
-            }
+            // Reset so the glow doesn't leak onto the next node
+            ctx.shadowBlur = 0;
           }}
 
           cooldownTicks={100}
